@@ -1,0 +1,73 @@
+import React, { useEffect, useRef } from "react";
+import * as handpose from "@mediapipe/handpose";
+import "@mediapipe/handpose/solutions/handpose.css";
+
+const App = () => {
+  const videoRef = useRef();
+  const canvasRef = useRef();
+
+  useEffect(() => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const context = canvas.getContext("2d");
+
+    const hands = new handpose.HandPose({
+      locateFile: (file) => {
+        return `https://cdn.jsdelivr.net/npm/@mediapipe/handpose@0.8.4/dist/${file}`;
+      },
+    });
+
+    hands.setOptions({
+      maxNumHands: 1,
+      detectionConfidence: 0.8,
+      trackingConfidence: 0.5,
+    });
+
+    navigator.mediaDevices
+      .getUserMedia({ video: true })
+      .then((stream) => {
+        video.srcObject = stream;
+        video.addEventListener("loadedmetadata", () => {
+          video.play();
+          requestAnimationFrame(renderFrame);
+        });
+      })
+      .catch((err) => {
+        console.error("Failed to get user media", err);
+      });
+
+    const renderFrame = () => {
+      hands.send({ image: video }).then((results) => {
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        if (results.multiHandLandmarks) {
+          for (const landmarks of results.multiHandLandmarks) {
+            for (const [x, y, z] of landmarks) {
+              context.beginPath();
+              context.arc(x * canvas.width, y * canvas.height, 5, 0, 2 * Math.PI);
+              context.fillStyle = "white";
+              context.fill();
+            }
+          }
+        }
+
+        requestAnimationFrame(renderFrame);
+      });
+    };
+  }, []);
+
+  return (
+    <div>
+      <video ref={videoRef} style={{ display: "none" }} />
+      <canvas
+        ref={canvasRef}
+        style={{ width: "100%", height: "100%" }}
+        width={640}
+        height={480}
+      />
+    </div>
+  );
+};
+
+export default App;
